@@ -1,7 +1,7 @@
 import { PokerLayout } from "@/components/PokerLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import {
@@ -26,14 +26,7 @@ interface Player {
   bet?: number;
 }
 
-interface Action {
-  player: string;
-  action: string;
-  amount?: number;
-  street: string;
-}
-
-// Mock hand data
+// Mock hand data for demo
 const mockHandData = {
   id: 1,
   handNumber: "234567890",
@@ -45,6 +38,7 @@ const mockHandData = {
   boardCards: ["Ah", "7c", "2d", "5s", "Kd"],
   potSize: 250.0,
   heroWon: 125.5,
+  gameFormat: "cash",
   players: [
     { name: "Hero", position: "BTN", stack: 100, cards: "AhKs", isHero: true },
     { name: "Villain1", position: "SB", stack: 98.5, isFolded: false },
@@ -72,17 +66,67 @@ const mockHandData = {
   ],
 };
 
-function formatCard(card: string) {
-  const rank = card[0];
-  const suit = card[1];
-  const suitSymbol = { h: "♥", d: "♦", c: "♣", s: "♠" }[suit.toLowerCase()] || suit;
-  const suitClass = ["h", "d"].includes(suit.toLowerCase()) ? "text-red-500" : "text-white";
+// Card component with proper colors
+function PokerCard({ card }: { card: string }) {
+  if (!card || card.length < 2) return null;
+  
+  const rank = card[0].toUpperCase();
+  const suit = card[1].toLowerCase();
+  
+  const suitSymbols: Record<string, string> = {
+    h: "♥",
+    d: "♦",
+    c: "♣",
+    s: "♠",
+  };
+  
+  const suitColors: Record<string, string> = {
+    h: "text-red-500",
+    d: "text-blue-500",
+    c: "text-green-600",
+    s: "text-gray-900",
+  };
+
+  const suitSymbol = suitSymbols[suit] || suit;
+  const suitColor = suitColors[suit] || "text-gray-900";
 
   return (
-    <span className={`${suitClass} font-bold`}>
-      {rank}
-      {suitSymbol}
-    </span>
+    <div className="w-10 h-14 bg-white rounded-lg shadow-lg flex flex-col items-center justify-center border border-gray-200">
+      <span className={`text-lg font-bold ${suitColor}`}>{rank}</span>
+      <span className={`text-xl ${suitColor}`}>{suitSymbol}</span>
+    </div>
+  );
+}
+
+// Board card component (larger)
+function BoardCard({ card }: { card: string }) {
+  if (!card || card.length < 2) return null;
+  
+  const rank = card[0].toUpperCase();
+  const suit = card[1].toLowerCase();
+  
+  const suitSymbols: Record<string, string> = {
+    h: "♥",
+    d: "♦",
+    c: "♣",
+    s: "♠",
+  };
+  
+  const suitColors: Record<string, string> = {
+    h: "text-red-500",
+    d: "text-blue-500",
+    c: "text-green-600",
+    s: "text-gray-900",
+  };
+
+  const suitSymbol = suitSymbols[suit] || suit;
+  const suitColor = suitColors[suit] || "text-gray-900";
+
+  return (
+    <div className="w-12 h-16 bg-white rounded-lg shadow-xl flex flex-col items-center justify-center border-2 border-gray-300">
+      <span className={`text-xl font-bold ${suitColor}`}>{rank}</span>
+      <span className={`text-2xl ${suitColor}`}>{suitSymbol}</span>
+    </div>
   );
 }
 
@@ -90,18 +134,16 @@ function PokerTable({
   players,
   pot,
   board,
-  currentAction,
 }: {
   players: Player[];
   pot: number;
   board: string[];
-  currentAction?: number;
 }) {
   const positions = [
-    { top: "85%", left: "50%", transform: "translate(-50%, -50%)" }, // BTN (bottom center)
+    { top: "85%", left: "50%", transform: "translate(-50%, -50%)" }, // BTN
     { top: "70%", left: "15%", transform: "translate(-50%, -50%)" }, // SB
     { top: "30%", left: "15%", transform: "translate(-50%, -50%)" }, // BB
-    { top: "15%", left: "50%", transform: "translate(-50%, -50%)" }, // UTG (top center)
+    { top: "15%", left: "50%", transform: "translate(-50%, -50%)" }, // UTG
     { top: "30%", left: "85%", transform: "translate(-50%, -50%)" }, // MP
     { top: "70%", left: "85%", transform: "translate(-50%, -50%)" }, // CO
   ];
@@ -109,9 +151,9 @@ function PokerTable({
   return (
     <div className="relative w-full aspect-[16/10] max-w-4xl mx-auto">
       {/* Table */}
-      <div className="absolute inset-[10%] rounded-[50%] bg-gradient-to-b from-green-900 to-green-950 border-8 border-amber-900 shadow-2xl">
+      <div className="absolute inset-[10%] rounded-[50%] bg-gradient-to-b from-green-800 to-green-950 border-8 border-amber-900 shadow-2xl">
         {/* Inner felt */}
-        <div className="absolute inset-4 rounded-[50%] border-2 border-green-700/50" />
+        <div className="absolute inset-4 rounded-[50%] border-2 border-green-600/50" />
 
         {/* Pot */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
@@ -122,17 +164,12 @@ function PokerTable({
         {/* Board Cards */}
         <div className="absolute top-[35%] left-1/2 -translate-x-1/2 flex gap-2">
           {board.map((card, i) => (
-            <div
-              key={i}
-              className="w-12 h-16 bg-white rounded-lg flex items-center justify-center text-xl font-bold shadow-lg"
-            >
-              {formatCard(card)}
-            </div>
+            <BoardCard key={i} card={card} />
           ))}
           {[...Array(5 - board.length)].map((_, i) => (
             <div
               key={`empty-${i}`}
-              className="w-12 h-16 bg-gray-800/50 rounded-lg border border-gray-700"
+              className="w-12 h-16 bg-green-900/50 rounded-lg border-2 border-green-700/50"
             />
           ))}
         </div>
@@ -148,7 +185,7 @@ function PokerTable({
           <div
             className={`p-3 rounded-lg border-2 transition-all ${
               player.isHero
-                ? "bg-primary/20 border-neon-pink"
+                ? "bg-primary/20 border-neon-pink shadow-lg shadow-neon-pink/20"
                 : player.isFolded
                 ? "bg-gray-900/50 border-gray-700 opacity-50"
                 : "bg-card border-border"
@@ -170,12 +207,7 @@ function PokerTable({
               {player.cards && (
                 <div className="flex gap-1 justify-center mt-2">
                   {player.cards.match(/.{2}/g)?.map((card, j) => (
-                    <div
-                      key={j}
-                      className="w-8 h-10 bg-white rounded text-sm flex items-center justify-center font-bold"
-                    >
-                      {formatCard(card)}
-                    </div>
+                    <PokerCard key={j} card={card} />
                   ))}
                 </div>
               )}
@@ -272,8 +304,15 @@ export default function HandReplay() {
             </Button>
           </Link>
           <div className="text-right">
-            <div className="text-sm text-muted-foreground">
-              {handData.site} - {handData.stakes}
+            <div className="flex items-center gap-2 justify-end">
+              <Badge variant={handData.gameFormat === "tournament" || handData.gameFormat === "mtt" ? "default" : "outline"}>
+                {handData.gameFormat === "cash" ? "Cash Game" : 
+                 handData.gameFormat === "tournament" || handData.gameFormat === "mtt" ? "Torneio" : 
+                 handData.gameFormat === "sng" ? "Sit & Go" : handData.gameFormat}
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                {handData.site} - {handData.stakes}
+              </span>
             </div>
             <div className="text-xs text-muted-foreground">
               Mão #{handData.handNumber}
@@ -288,7 +327,6 @@ export default function HandReplay() {
               players={players}
               pot={pot}
               board={board}
-              currentAction={currentStep}
             />
           </CardContent>
         </Card>
@@ -399,19 +437,17 @@ export default function HandReplay() {
 
         {/* Action History */}
         <Card className="glass-card border-border/50">
-          <CardHeader>
-            <CardTitle className="text-lg">Histórico de Ações</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          <CardContent className="p-4">
+            <h3 className="font-semibold mb-4">Histórico de Ações</h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
               {handData.actions.map((action, i) => (
                 <div
                   key={i}
-                  className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                  className={`flex items-center gap-3 p-2 rounded ${
                     i < currentStep
                       ? "bg-muted/30"
                       : i === currentStep
-                      ? "bg-primary/20 border border-primary/50"
+                      ? "bg-neon-pink/10 border border-neon-pink/30"
                       : "opacity-50"
                   }`}
                 >
@@ -421,7 +457,7 @@ export default function HandReplay() {
                   <span className="font-medium w-24">{action.player}</span>
                   <span className="text-muted-foreground">{action.action}</span>
                   {action.amount && (
-                    <span className="text-neon-pink font-bold ml-auto">
+                    <span className="text-neon-cyan ml-auto">
                       ${action.amount.toFixed(2)}
                     </span>
                   )}

@@ -14,6 +14,7 @@ import Statistics from "./pages/Statistics";
 import Sessions from "./pages/Sessions";
 import Analysis from "./pages/Analysis";
 import Settings from "./pages/Settings";
+import Pricing from "./pages/Pricing";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/sessions" component={Sessions} />
       <Route path="/analysis" component={Analysis} />
       <Route path="/settings" component={Settings} />
+      <Route path="/pricing" component={Pricing} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

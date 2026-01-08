@@ -20,6 +20,9 @@ interface HandCardProps {
     playedAt: string;
     boardCards?: string;
     tags?: string[];
+    gameFormat?: string;
+    tournamentName?: string;
+    stakes?: string;
   };
 }
 
@@ -61,6 +64,13 @@ function HandCard({ hand }: HandCardProps) {
                 <Badge variant="outline" className="text-neon-cyan border-neon-cyan/50">
                   {hand.heroPosition}
                 </Badge>
+                {hand.gameFormat && hand.gameFormat !== "cash" && (
+                  <Badge variant={hand.gameFormat === "mtt" || hand.gameFormat === "tournament" ? "default" : "secondary"} className="text-xs">
+                    {hand.gameFormat === "cash" ? "Cash" : 
+                     hand.gameFormat === "tournament" || hand.gameFormat === "mtt" ? "Torneio" : 
+                     hand.gameFormat === "sng" ? "SNG" : hand.gameFormat}
+                  </Badge>
+                )}
                 <span className="text-sm text-muted-foreground">
                   #{hand.handNumber}
                 </span>
@@ -123,6 +133,7 @@ export default function HandHistory() {
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<string>("all");
   const [result, setResult] = useState<string>("all");
+  const [gameFormat, setGameFormat] = useState<string>("all");
   const [page, setPage] = useState(1);
 
   const { data: handsData, isLoading } = trpc.hands.list.useQuery({
@@ -131,6 +142,7 @@ export default function HandHistory() {
     search,
     position: position !== "all" ? position : undefined,
     result: result !== "all" ? result : undefined,
+    gameFormat: gameFormat !== "all" ? gameFormat : undefined,
   });
 
   // Mock data for display
@@ -222,6 +234,20 @@ export default function HandHistory() {
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="won">Ganhou</SelectItem>
                   <SelectItem value="lost">Perdeu</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Game Format Filter */}
+              <Select value={gameFormat} onValueChange={setGameFormat}>
+                <SelectTrigger className="w-[140px] bg-input border-border">
+                  <SelectValue placeholder="Formato" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="cash">Cash Game</SelectItem>
+                  <SelectItem value="tournament">Torneio</SelectItem>
+                  <SelectItem value="mtt">MTT</SelectItem>
+                  <SelectItem value="sng">Sit & Go</SelectItem>
                 </SelectContent>
               </Select>
             </div>

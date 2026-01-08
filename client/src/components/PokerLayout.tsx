@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Crown,
   FileUp,
   Grid3X3,
   History,
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { title: "Sessões", href: "/sessions", icon: Clock },
   { title: "Análise IA", href: "/analysis", icon: Sparkles },
   { title: "Configurações", href: "/settings", icon: Settings },
+  { title: "Planos", href: "/pricing", icon: Crown },
 ];
 
 interface PokerLayoutProps {

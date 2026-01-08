@@ -92,3 +92,19 @@
 - [x] Efeitos de glow
 - [x] Elementos HUD minimalistas
 - [x] Linhas técnicas e colchetes de canto
+
+
+## Bugs e Melhorias Reportadas
+
+### Correções de Bugs
+- [x] Corrigir detecção de tipo de jogo (Cash vs Torneio) no parser
+- [x] Corrigir cartas brancas no replay de mãos
+- [x] Melhorar parser para identificar formato de torneio
+
+### Sistema de Assinaturas
+- [x] Criar tabela de planos de assinatura no banco
+- [x] Criar tabela de créditos do usuário
+- [x] Implementar sistema de créditos gratuitos limitados
+- [x] Criar página de planos e preços
+- [x] Implementar verificação de créditos antes de usar funcionalidades premium
+- [ ] Adicionar integração com Stripe para pagamentos

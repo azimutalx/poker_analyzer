@@ -44,6 +44,10 @@ export const hands = mysqlTable("hands", {
   sessionId: int("sessionId"),
   site: varchar("site", { length: 64 }).notNull(),
   gameType: varchar("gameType", { length: 64 }).notNull(),
+  gameFormat: mysqlEnum("gameFormat", ["cash", "tournament", "sng", "mtt"]).default("cash"),
+  tournamentId: varchar("tournamentId", { length: 64 }),
+  tournamentName: varchar("tournamentName", { length: 255 }),
+  tournamentBuyIn: varchar("tournamentBuyIn", { length: 64 }),
   stakes: varchar("stakes", { length: 64 }),
   tableName: varchar("tableName", { length: 255 }),
   
@@ -242,3 +246,76 @@ export const gtoRanges = mysqlTable("gtoRanges", {
 
 export type GtoRange = typeof gtoRanges.$inferSelect;
 export type InsertGtoRange = typeof gtoRanges.$inferInsert;
+
+
+// Subscription plans
+export const subscriptionPlans = mysqlTable("subscriptionPlans", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 64 }).notNull(),
+  slug: varchar("slug", { length: 64 }).notNull().unique(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  interval: mysqlEnum("interval", ["month", "year"]).default("month"),
+  
+  // Features
+  handsPerMonth: int("handsPerMonth").default(100), // -1 for unlimited
+  analysisPerMonth: int("analysisPerMonth").default(1), // AI analysis reports
+  replayAccess: boolean("replayAccess").default(true),
+  gtoRangesAccess: boolean("gtoRangesAccess").default(false),
+  exportAccess: boolean("exportAccess").default(false),
+  prioritySupport: boolean("prioritySupport").default(false),
+  
+  description: text("description"),
+  isActive: boolean("isActive").default(true),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type InsertSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
+
+// User subscriptions
+export const userSubscriptions = mysqlTable("userSubscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  planId: int("planId").notNull(),
+  
+  status: mysqlEnum("status", ["active", "canceled", "expired", "trial"]).default("trial"),
+  
+  startDate: timestamp("startDate").defaultNow().notNull(),
+  endDate: timestamp("endDate"),
+  
+  // Stripe integration
+  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserSubscription = typeof userSubscriptions.$inferSelect;
+export type InsertUserSubscription = typeof userSubscriptions.$inferInsert;
+
+// User credits
+export const userCredits = mysqlTable("userCredits", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  
+  // Current credits
+  handsImported: int("handsImported").default(0),
+  handsLimit: int("handsLimit").default(50), // Free tier limit
+  analysisUsed: int("analysisUsed").default(0),
+  analysisLimit: int("analysisLimit").default(1), // Free tier limit
+  replaysUsed: int("replaysUsed").default(0),
+  replaysLimit: int("replaysLimit").default(10), // Free tier limit
+  
+  // Reset tracking
+  lastResetAt: timestamp("lastResetAt").defaultNow().notNull(),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserCredits = typeof userCredits.$inferSelect;
+export type InsertUserCredits = typeof userCredits.$inferInsert;

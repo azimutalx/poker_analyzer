@@ -4,9 +4,218 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { hands, sessions, userStats, positionStats, handTags, analysisReports, notifications } from "../drizzle/schema";
-import { eq, desc, and, like, sql } from "drizzle-orm";
+import { hands, sessions, userStats, positionStats, handTags, analysisReports, notifications, userCredits, subscriptionPlans, userSubscriptions } from "../drizzle/schema";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
+
+// Helper function to parse poker hand history
+function parsePokerHand(rawHand: string, site: string) {
+  const result: any = {
+    handNumber: null,
+    heroCards: null,
+    heroPosition: null,
+    heroWon: 0,
+    gameFormat: "cash" as "cash" | "tournament" | "sng" | "mtt",
+    gameType: "NL Hold'em",
+    tournamentId: null,
+    tournamentName: null,
+    tournamentBuyIn: null,
+    stakes: null,
+    tableName: null,
+    boardCards: null,
+    potSize: 0,
+    preflopAction: null,
+    players: [],
+    actions: [],
+  };
+
+  // Extract hand number
+  const handNumberMatch = rawHand.match(/Hand #(\d+)/);
+  result.handNumber = handNumberMatch ? handNumberMatch[1] : `${Date.now()}-${Math.random()}`;
+
+  // Detect game format (Tournament vs Cash)
+  const tournamentMatch = rawHand.match(/Tournament #(\d+)/i);
+  const sitAndGoMatch = rawHand.match(/Sit & Go|SNG|Sit and Go/i);
+  const mttMatch = rawHand.match(/MTT|Multi-Table Tournament/i);
+  
+  if (tournamentMatch) {
+    result.tournamentId = tournamentMatch[1];
+    result.gameFormat = sitAndGoMatch ? "sng" : "mtt";
+    
+    // Extract tournament name
+    const tournamentNameMatch = rawHand.match(/Tournament #\d+,\s*([^,\n]+)/i);
+    if (tournamentNameMatch) {
+      result.tournamentName = tournamentNameMatch[1].trim();
+    }
+    
+    // Extract buy-in
+    const buyInMatch = rawHand.match(/\$?([\d.]+)\+\$?([\d.]+)/);
+    if (buyInMatch) {
+      result.tournamentBuyIn = `$${buyInMatch[1]}+$${buyInMatch[2]}`;
+    }
+  } else if (rawHand.match(/\$[\d.]+\/\$[\d.]+/)) {
+    result.gameFormat = "cash";
+    const stakesMatch = rawHand.match(/\$([\d.]+)\/\$([\d.]+)/);
+    if (stakesMatch) {
+      result.stakes = `$${stakesMatch[1]}/$${stakesMatch[2]}`;
+    }
+  } else if (rawHand.match(/Tournament/i)) {
+    result.gameFormat = "tournament";
+    result.tournamentId = tournamentMatch ? tournamentMatch[1] : null;
+  }
+
+  // Extract game type
+  if (rawHand.match(/Omaha/i)) {
+    result.gameType = rawHand.match(/5 Card/i) ? "PLO5" : "PLO";
+  } else if (rawHand.match(/Hold'em|Holdem/i)) {
+    result.gameType = rawHand.match(/Pot Limit/i) ? "PL Hold'em" : "NL Hold'em";
+  }
+
+  // Extract table name
+  const tableNameMatch = rawHand.match(/Table '([^']+)'/);
+  if (tableNameMatch) {
+    result.tableName = tableNameMatch[1];
+  }
+
+  // Extract hero cards
+  const heroCardsMatch = rawHand.match(/Dealt to ([^\[]+)\[([^\]]+)\]/);
+  if (heroCardsMatch) {
+    const heroName = heroCardsMatch[1].trim();
+    result.heroCards = heroCardsMatch[2].replace(/\s/g, '');
+    
+    // Determine hero position
+    const positionPatterns = [
+      { pattern: new RegExp(`${heroName}.*button`, 'i'), position: "BTN" },
+      { pattern: new RegExp(`${heroName}.*small blind`, 'i'), position: "SB" },
+      { pattern: new RegExp(`${heroName}.*big blind`, 'i'), position: "BB" },
+      { pattern: new RegExp(`${heroName}.*cut.?off|${heroName}.*CO`, 'i'), position: "CO" },
+      { pattern: new RegExp(`${heroName}.*middle|${heroName}.*MP`, 'i'), position: "MP" },
+      { pattern: new RegExp(`${heroName}.*under|${heroName}.*UTG`, 'i'), position: "UTG" },
+    ];
+
+    for (const { pattern, position } of positionPatterns) {
+      if (pattern.test(rawHand)) {
+        result.heroPosition = position;
+        break;
+      }
+    }
+    
+    // Fallback position detection based on seat order
+    if (!result.heroPosition) {
+      const buttonSeatMatch = rawHand.match(/Seat #?(\d+) is the button/i);
+      const heroSeatMatch = rawHand.match(new RegExp(`Seat (\\d+): ${heroName}`, 'i'));
+      
+      if (buttonSeatMatch && heroSeatMatch) {
+        const buttonSeat = parseInt(buttonSeatMatch[1]);
+        const heroSeat = parseInt(heroSeatMatch[1]);
+        
+        if (heroSeat === buttonSeat) result.heroPosition = "BTN";
+      }
+    }
+  }
+
+  // Extract board cards
+  const boardMatch = rawHand.match(/Board \[([^\]]+)\]/i);
+  if (boardMatch) {
+    result.boardCards = boardMatch[1].trim();
+  } else {
+    // Try to extract from FLOP/TURN/RIVER
+    const flopMatch = rawHand.match(/\*\*\* FLOP \*\*\* \[([^\]]+)\]/);
+    const turnMatch = rawHand.match(/\*\*\* TURN \*\*\* \[[^\]]+\] \[([^\]]+)\]/);
+    const riverMatch = rawHand.match(/\*\*\* RIVER \*\*\* \[[^\]]+\] \[([^\]]+)\]/);
+    
+    let board = [];
+    if (flopMatch) board.push(flopMatch[1]);
+    if (turnMatch) board.push(turnMatch[1]);
+    if (riverMatch) board.push(riverMatch[1]);
+    
+    if (board.length > 0) {
+      result.boardCards = board.join(' ');
+    }
+  }
+
+  // Extract pot size
+  const potMatch = rawHand.match(/Total pot (?:\$|€)?([\d.]+)/i);
+  if (potMatch) {
+    result.potSize = parseFloat(potMatch[1]);
+  }
+
+  // Extract result
+  const wonMatch = rawHand.match(/collected (?:\$|€)?([\d.]+)/i);
+  if (wonMatch) {
+    result.heroWon = parseFloat(wonMatch[1]);
+  }
+
+  // Extract preflop action
+  if (rawHand.match(/raises|raised/i)) {
+    result.preflopAction = rawHand.match(/3-bet|re-raise/i) ? "3bet" : "raise";
+  } else if (rawHand.match(/calls|called/i)) {
+    result.preflopAction = "call";
+  } else if (rawHand.match(/folds|folded/i)) {
+    result.preflopAction = "fold";
+  }
+
+  return result;
+}
+
+// Helper to check and update user credits
+async function checkAndUpdateCredits(userId: number, creditType: 'hands' | 'analysis' | 'replays', amount: number = 1) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Get or create user credits
+  let credits = await db.select().from(userCredits).where(eq(userCredits.userId, userId)).limit(1);
+  
+  if (credits.length === 0) {
+    await db.insert(userCredits).values({ userId });
+    credits = await db.select().from(userCredits).where(eq(userCredits.userId, userId)).limit(1);
+  }
+
+  const userCredit = credits[0];
+  
+  // Check subscription for unlimited access
+  const subscription = await db.select()
+    .from(userSubscriptions)
+    .where(and(eq(userSubscriptions.userId, userId), eq(userSubscriptions.status, "active")))
+    .limit(1);
+
+  if (subscription.length > 0) {
+    // User has active subscription, allow access
+    return { allowed: true, remaining: -1, isSubscribed: true };
+  }
+
+  // Check free tier limits
+  let used = 0;
+  let limit = 0;
+
+  switch (creditType) {
+    case 'hands':
+      used = userCredit.handsImported || 0;
+      limit = userCredit.handsLimit || 50;
+      break;
+    case 'analysis':
+      used = userCredit.analysisUsed || 0;
+      limit = userCredit.analysisLimit || 1;
+      break;
+    case 'replays':
+      used = userCredit.replaysUsed || 0;
+      limit = userCredit.replaysLimit || 10;
+      break;
+  }
+
+  if (used + amount > limit) {
+    return { allowed: false, remaining: limit - used, isSubscribed: false };
+  }
+
+  // Update credits
+  const updateField = creditType === 'hands' ? { handsImported: used + amount }
+    : creditType === 'analysis' ? { analysisUsed: used + amount }
+    : { replaysUsed: used + amount };
+
+  await db.update(userCredits).set(updateField).where(eq(userCredits.userId, userId));
+
+  return { allowed: true, remaining: limit - used - amount, isSubscribed: false };
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -17,6 +226,57 @@ export const appRouter = router({
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
+    }),
+  }),
+
+  // Credits router
+  credits: router({
+    getMyCredits: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return null;
+
+      let credits = await db.select().from(userCredits).where(eq(userCredits.userId, ctx.user.id)).limit(1);
+      
+      if (credits.length === 0) {
+        await db.insert(userCredits).values({ userId: ctx.user.id });
+        credits = await db.select().from(userCredits).where(eq(userCredits.userId, ctx.user.id)).limit(1);
+      }
+
+      // Check subscription
+      const subscription = await db.select()
+        .from(userSubscriptions)
+        .where(and(eq(userSubscriptions.userId, ctx.user.id), eq(userSubscriptions.status, "active")))
+        .limit(1);
+
+      return {
+        ...credits[0],
+        isSubscribed: subscription.length > 0,
+        subscription: subscription[0] || null,
+      };
+    }),
+  }),
+
+  // Subscription router
+  subscription: router({
+    getPlans: publicProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+
+      const plans = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true));
+      return plans;
+    }),
+
+    getMySubscription: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return null;
+
+      const subscription = await db.select()
+        .from(userSubscriptions)
+        .where(eq(userSubscriptions.userId, ctx.user.id))
+        .orderBy(desc(userSubscriptions.createdAt))
+        .limit(1);
+
+      return subscription[0] || null;
     }),
   }),
 
@@ -35,9 +295,15 @@ export const appRouter = router({
         const userId = ctx.user.id;
         const { site, rawHistory } = input;
 
-        // Parse hands from raw history (simplified parser)
-        const handMatches = rawHistory.split(/(?=PokerStars Hand #|888poker Hand #|Hand #)/g)
+        // Parse hands from raw history
+        const handMatches = rawHistory.split(/(?=PokerStars Hand #|888poker Hand #|Hand #|Winamax Poker)/g)
           .filter(h => h.trim().length > 0);
+
+        // Check credits
+        const creditCheck = await checkAndUpdateCredits(userId, 'hands', handMatches.length);
+        if (!creditCheck.allowed) {
+          throw new Error(`Limite de mãos atingido. Você pode importar mais ${creditCheck.remaining} mãos. Faça upgrade para continuar.`);
+        }
 
         let success = 0;
         let failed = 0;
@@ -45,35 +311,28 @@ export const appRouter = router({
 
         for (const rawHand of handMatches) {
           try {
-            // Extract basic info (simplified parsing)
-            const handNumberMatch = rawHand.match(/Hand #(\d+)/);
-            const handNumber = handNumberMatch ? handNumberMatch[1] : `${Date.now()}-${Math.random()}`;
-
-            // Extract hero cards
-            const heroCardsMatch = rawHand.match(/Dealt to .+ \[([^\]]+)\]/);
-            const heroCards = heroCardsMatch ? heroCardsMatch[1].replace(/\s/g, '') : null;
-
-            // Determine position (simplified)
-            let heroPosition: "BTN" | "CO" | "MP" | "UTG" | "BB" | "SB" | null = null;
-            if (rawHand.includes("button")) heroPosition = "BTN";
-            else if (rawHand.includes("small blind")) heroPosition = "SB";
-            else if (rawHand.includes("big blind")) heroPosition = "BB";
-
-            // Extract result
-            const wonMatch = rawHand.match(/collected \$?([\d.]+)/);
-            const heroWon = wonMatch ? parseFloat(wonMatch[1]) : 0;
+            const parsed = parsePokerHand(rawHand, site);
 
             await db.insert(hands).values({
-              odlId: `${site}-${handNumber}`,
+              odlId: `${site}-${parsed.handNumber}`,
               userId,
               site,
-              gameType: "NL Hold'em",
-              handNumber,
-              heroCards,
-              heroPosition,
-              heroWon: heroWon.toString(),
+              gameType: parsed.gameType,
+              gameFormat: parsed.gameFormat,
+              tournamentId: parsed.tournamentId,
+              tournamentName: parsed.tournamentName,
+              tournamentBuyIn: parsed.tournamentBuyIn,
+              stakes: parsed.stakes,
+              tableName: parsed.tableName,
+              handNumber: parsed.handNumber,
+              heroCards: parsed.heroCards,
+              heroPosition: parsed.heroPosition,
+              boardCards: parsed.boardCards,
+              potSize: parsed.potSize.toString(),
+              heroWon: parsed.heroWon.toString(),
+              preflopAction: parsed.preflopAction,
               rawHistory: rawHand,
-              parsedData: JSON.stringify({ raw: true }),
+              parsedData: JSON.stringify(parsed),
               playedAt: new Date(),
             });
 
@@ -87,7 +346,13 @@ export const appRouter = router({
         // Update user stats
         await updateUserStats(userId);
 
-        return { success, failed, errors };
+        return { 
+          success, 
+          failed, 
+          errors,
+          creditsRemaining: creditCheck.remaining,
+          isSubscribed: creditCheck.isSubscribed,
+        };
       }),
 
     // List hands with pagination and filters
@@ -98,20 +363,24 @@ export const appRouter = router({
         search: z.string().optional(),
         position: z.string().optional(),
         result: z.string().optional(),
+        gameFormat: z.string().optional(),
       }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) return { hands: [], totalPages: 0 };
 
         const userId = ctx.user.id;
-        const { page, limit, search, position, result } = input;
+        const { page, limit, position, gameFormat } = input;
         const offset = (page - 1) * limit;
 
         const conditions = [eq(hands.userId, userId)];
         
-        // Apply filters
         if (position) {
           conditions.push(eq(hands.heroPosition, position as any));
+        }
+        
+        if (gameFormat) {
+          conditions.push(eq(hands.gameFormat, gameFormat as any));
         }
 
         const handsList = await db.select().from(hands).where(and(...conditions))
@@ -136,6 +405,10 @@ export const appRouter = router({
             potSize: h.potSize || '0',
             playedAt: h.playedAt?.toISOString() || '',
             boardCards: h.boardCards || '',
+            gameFormat: h.gameFormat || 'cash',
+            gameType: h.gameType || '',
+            tournamentName: h.tournamentName || '',
+            stakes: h.stakes || '',
             tags: [],
           })),
           totalPages,
@@ -148,6 +421,12 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) return null;
+
+        // Check replay credits
+        const creditCheck = await checkAndUpdateCredits(ctx.user.id, 'replays');
+        if (!creditCheck.allowed) {
+          throw new Error(`Limite de replays atingido. Faça upgrade para continuar.`);
+        }
 
         const result = await db.select()
           .from(hands)
@@ -258,6 +537,12 @@ export const appRouter = router({
 
       const userId = ctx.user.id;
 
+      // Check analysis credits
+      const creditCheck = await checkAndUpdateCredits(userId, 'analysis');
+      if (!creditCheck.allowed) {
+        throw new Error(`Limite de análises atingido. Faça upgrade para continuar.`);
+      }
+
       // Get user's hands for analysis
       const userHands = await db.select()
         .from(hands)
@@ -275,6 +560,7 @@ export const appRouter = router({
         result: h.netResult,
         preflopAction: h.preflopAction,
         wentToShowdown: h.wentToShowdown,
+        gameFormat: h.gameFormat,
       }));
 
       // Call LLM for analysis
@@ -380,7 +666,11 @@ Responda em JSON com a estrutura:
         periodEnd: new Date(),
       });
 
-      return analysis;
+      return {
+        ...analysis,
+        creditsRemaining: creditCheck.remaining,
+        isSubscribed: creditCheck.isSubscribed,
+      };
     }),
 
     getLatestReport: protectedProcedure.query(async ({ ctx }) => {
