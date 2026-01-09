@@ -319,3 +319,120 @@ export const userCredits = mysqlTable("userCredits", {
 
 export type UserCredits = typeof userCredits.$inferSelect;
 export type InsertUserCredits = typeof userCredits.$inferInsert;
+
+// Promotions and coupons table
+export const promotions = mysqlTable("promotions", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 64 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  discountType: mysqlEnum("discountType", ["percentage", "fixed"]).notNull(),
+  discountValue: decimal("discountValue", { precision: 10, scale: 2 }).notNull(),
+  maxUses: int("maxUses"),
+  usedCount: int("usedCount").default(0),
+  validFrom: timestamp("validFrom"),
+  validUntil: timestamp("validUntil"),
+  isActive: boolean("isActive").default(true),
+  applicablePlans: json("applicablePlans"), // Array of plan IDs
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Promotion = typeof promotions.$inferSelect;
+export type InsertPromotion = typeof promotions.$inferInsert;
+
+// Promotion usage tracking
+export const promotionUsage = mysqlTable("promotionUsage", {
+  id: int("id").autoincrement().primaryKey(),
+  promotionId: int("promotionId").notNull(),
+  userId: int("userId").notNull(),
+  subscriptionId: int("subscriptionId"),
+  discountApplied: decimal("discountApplied", { precision: 10, scale: 2 }),
+  usedAt: timestamp("usedAt").defaultNow().notNull(),
+});
+
+export type PromotionUsage = typeof promotionUsage.$inferSelect;
+export type InsertPromotionUsage = typeof promotionUsage.$inferInsert;
+
+// Announcements and banners table
+export const announcements = mysqlTable("announcements", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  type: mysqlEnum("type", ["banner", "modal", "notification", "toast"]).notNull(),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium"),
+  targetAudience: mysqlEnum("targetAudience", ["all", "free", "subscribed", "admin"]).default("all"),
+  displayLocation: varchar("displayLocation", { length: 64 }), // dashboard, pricing, etc.
+  imageUrl: varchar("imageUrl", { length: 512 }),
+  ctaText: varchar("ctaText", { length: 64 }),
+  ctaUrl: varchar("ctaUrl", { length: 512 }),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  isActive: boolean("isActive").default(true),
+  impressions: int("impressions").default(0),
+  clicks: int("clicks").default(0),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = typeof announcements.$inferInsert;
+
+// Payment transactions table
+export const transactions = mysqlTable("transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  subscriptionId: int("subscriptionId"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  status: mysqlEnum("status", ["pending", "completed", "failed", "refunded"]).notNull(),
+  paymentMethod: varchar("paymentMethod", { length: 64 }),
+  paymentProvider: varchar("paymentProvider", { length: 64 }), // stripe, paypal, etc.
+  transactionId: varchar("transactionId", { length: 255 }).unique(),
+  metadata: json("metadata"),
+  promotionId: int("promotionId"),
+  discountApplied: decimal("discountApplied", { precision: 10, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = typeof transactions.$inferInsert;
+
+// Admin activity logs
+export const adminLogs = mysqlTable("adminLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  adminId: int("adminId").notNull(),
+  action: varchar("action", { length: 255 }).notNull(),
+  targetType: varchar("targetType", { length: 64 }), // user, subscription, promotion, etc.
+  targetId: int("targetId"),
+  details: json("details"),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AdminLog = typeof adminLogs.$inferSelect;
+export type InsertAdminLog = typeof adminLogs.$inferInsert;
+
+// Platform metrics (for admin dashboard)
+export const platformMetrics = mysqlTable("platformMetrics", {
+  id: int("id").autoincrement().primaryKey(),
+  date: timestamp("date").notNull(),
+  totalUsers: int("totalUsers").default(0),
+  activeUsers: int("activeUsers").default(0),
+  newUsers: int("newUsers").default(0),
+  totalSubscriptions: int("totalSubscriptions").default(0),
+  activeSubscriptions: int("activeSubscriptions").default(0),
+  newSubscriptions: int("newSubscriptions").default(0),
+  canceledSubscriptions: int("canceledSubscriptions").default(0),
+  mrr: decimal("mrr", { precision: 12, scale: 2 }).default("0"), // Monthly Recurring Revenue
+  revenue: decimal("revenue", { precision: 12, scale: 2 }).default("0"),
+  handsImported: int("handsImported").default(0),
+  analysisGenerated: int("analysisGenerated").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PlatformMetric = typeof platformMetrics.$inferSelect;
+export type InsertPlatformMetric = typeof platformMetrics.$inferInsert;

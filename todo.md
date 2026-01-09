@@ -112,3 +112,16 @@
 
 ## Novos Bugs Reportados
 - [x] Corrigir botão de excluir dados que não está funcionando
+
+
+## Painel Administrativo
+- [x] Estender schema com tabelas de promoções, cupons e anúncios
+- [x] Dashboard admin com métricas de receita, usuários ativos e conversão
+- [x] Gestão de usuários (visualizar, editar role, suspender)
+- [ ] Controle de assinaturas (ativas, canceladas, renovações)
+- [x] Sistema de promoções e cupons de desconto
+- [x] Gestão de anúncios e banners
+- [ ] Histórico de pagamentos e transações
+- [ ] Relatórios financeiros (MRR, churn rate, LTV)
+- [ ] Sistema de notificações para admins
+- [ ] Logs de atividades administrativas

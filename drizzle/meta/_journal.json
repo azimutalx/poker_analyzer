@@ -22,6 +22,13 @@
       "when": 1767912555383,
       "tag": "0002_little_boom_boom",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1767970956621,
+      "tag": "0003_wakeful_wonder_man",
+      "breakpoints": true
     }
   ]
 }

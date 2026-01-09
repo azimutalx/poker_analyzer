@@ -14,6 +14,7 @@ import {
   Home,
   LogOut,
   Settings,
+  Shield,
   Sparkles,
   User,
 } from "lucide-react";
@@ -46,6 +47,13 @@ const navItems: NavItem[] = [
   { title: "Análise IA", href: "/analysis", icon: Sparkles },
   { title: "Configurações", href: "/settings", icon: Settings },
   { title: "Planos", href: "/pricing", icon: Crown },
+];
+
+const adminNavItems: NavItem[] = [
+  { title: "Admin Dashboard", href: "/admin", icon: Shield },
+  { title: "Usuários", href: "/admin/users", icon: User },
+  { title: "Promoções", href: "/admin/promotions", icon: Crown },
+  { title: "Anúncios", href: "/admin/announcements", icon: Bell },
 ];
 
 interface PokerLayoutProps {
@@ -146,6 +154,43 @@ export function PokerLayout({ children, title }: PokerLayoutProps) {
                   </Link>
                 );
               })}
+
+              {/* Admin Section */}
+              {user.role === "admin" && (
+                <>
+                  {!collapsed && (
+                    <div className="px-3 py-2 mt-4">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                        <Shield className="h-3 w-3" />
+                        Admin
+                      </div>
+                    </div>
+                  )}
+                  {adminNavItems.map((item) => {
+                    const isActive = location === item.href;
+                    return (
+                      <Link key={item.href} href={item.href}>
+                        <span
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all cursor-pointer",
+                            isActive
+                              ? "bg-neon-cyan/10 text-neon-cyan border-l-2 border-neon-cyan"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          )}
+                        >
+                          <item.icon
+                            className={cn(
+                              "h-5 w-5 flex-shrink-0",
+                              isActive && "text-neon-cyan"
+                            )}
+                          />
+                          {!collapsed && <span>{item.title}</span>}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
             </nav>
           </ScrollArea>
 

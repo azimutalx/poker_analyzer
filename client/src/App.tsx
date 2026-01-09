@@ -15,6 +15,10 @@ import Sessions from "./pages/Sessions";
 import Analysis from "./pages/Analysis";
 import Settings from "./pages/Settings";
 import Pricing from "./pages/Pricing";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminUsers from "./pages/AdminUsers";
+import AdminPromotions from "./pages/AdminPromotions";
+import AdminAnnouncements from "./pages/AdminAnnouncements";
 
 function Router() {
   return (
@@ -30,6 +34,13 @@ function Router() {
       <Route path="/analysis" component={Analysis} />
       <Route path="/settings" component={Settings} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin/users" component={AdminUsers} />
+      <Route path="/admin/subscriptions" component={AdminDashboard} />
+      <Route path="/admin/promotions" component={AdminPromotions} />
+      <Route path="/admin/announcements" component={AdminAnnouncements} />
+      <Route path="/admin/transactions" component={AdminDashboard} />
+      <Route path="/admin/logs" component={AdminDashboard} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
