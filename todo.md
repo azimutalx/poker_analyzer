@@ -108,3 +108,7 @@
 - [x] Criar página de planos e preços
 - [x] Implementar verificação de créditos antes de usar funcionalidades premium
 - [ ] Adicionar integração com Stripe para pagamentos
+
+
+## Novos Bugs Reportados
+- [x] Corrigir botão de excluir dados que não está funcionando

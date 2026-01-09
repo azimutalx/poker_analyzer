@@ -7,6 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Bell,
   Cloud,
@@ -38,6 +50,21 @@ export default function Settings() {
     timezone: "America/Sao_Paulo",
     defaultStakes: "$0.50/$1.00",
   });
+
+  const deleteDataMutation = trpc.data.deleteAllData.useMutation({
+    onSuccess: () => {
+      toast.success("Todos os dados foram excluídos com sucesso!");
+      // Reload page to refresh state
+      setTimeout(() => window.location.reload(), 1500);
+    },
+    onError: (error) => {
+      toast.error(`Erro ao excluir dados: ${error.message}`);
+    },
+  });
+
+  const handleDeleteAllData = () => {
+    deleteDataMutation.mutate();
+  };
 
   const handleSave = () => {
     toast.success("Configurações salvas com sucesso!");
@@ -394,10 +421,32 @@ export default function Settings() {
                             Esta ação é irreversível e excluirá todas as suas mãos e estatísticas
                           </p>
                         </div>
-                        <Button variant="destructive" className="gap-2">
-                          <Trash2 className="h-4 w-4" />
-                          Excluir
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" className="gap-2" disabled={deleteDataMutation.isPending}>
+                              <Trash2 className="h-4 w-4" />
+                              {deleteDataMutation.isPending ? "Excluindo..." : "Excluir"}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="glass-card border-border">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-red-400">Tem certeza absoluta?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta ação não pode ser desfeita. Isso irá excluir permanentemente todas as suas mãos,
+                                estatísticas, análises, sessões e tags do nosso servidor.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handleDeleteAllData}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Sim, excluir tudo
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </CardContent>
                   </Card>

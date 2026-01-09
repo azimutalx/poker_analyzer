@@ -719,6 +719,36 @@ Responda em JSON com a estrutura:
       }),
   }),
 
+  // Data management router
+  data: router({
+    deleteAllData: protectedProcedure.mutation(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const userId = ctx.user.id;
+
+      // Delete all user data in correct order (respecting foreign keys)
+      await db.delete(handTags).where(eq(handTags.userId, userId));
+      await db.delete(analysisReports).where(eq(analysisReports.userId, userId));
+      await db.delete(notifications).where(eq(notifications.userId, userId));
+      await db.delete(positionStats).where(eq(positionStats.userId, userId));
+      await db.delete(hands).where(eq(hands.userId, userId));
+      await db.delete(sessions).where(eq(sessions.userId, userId));
+      await db.delete(userStats).where(eq(userStats.userId, userId));
+      
+      // Reset user credits
+      await db.update(userCredits)
+        .set({ 
+          handsImported: 0, 
+          analysisUsed: 0, 
+          replaysUsed: 0 
+        })
+        .where(eq(userCredits.userId, userId));
+
+      return { success: true };
+    }),
+  }),
+
   // Tags router
   tags: router({
     list: protectedProcedure.query(async ({ ctx }) => {
