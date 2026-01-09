@@ -67,7 +67,7 @@ export const adminRouter = router({
     const revenueResult = await db.select({ total: sql<number>`COALESCE(SUM(amount), 0)` })
       .from(transactions)
       .where(eq(transactions.status, "completed"));
-    const totalRevenue = revenueResult[0]?.total || 0;
+    const totalRevenue = Number(revenueResult[0]?.total || 0);
 
     // MRR calculation (active subscriptions * plan price)
     const activeSubs = await db.select({
@@ -107,14 +107,14 @@ export const adminRouter = router({
     const churnRate = activeSubscriptions > 0 ? (canceledThisMonth / activeSubscriptions * 100).toFixed(2) : "0.00";
 
     return {
-      totalUsers,
-      activeSubscriptions,
+      totalUsers: Number(totalUsers),
+      activeSubscriptions: Number(activeSubscriptions),
       totalRevenue: totalRevenue.toFixed(2),
       mrr: mrr.toFixed(2),
-      newUsersThisMonth,
-      totalHands,
+      newUsersThisMonth: Number(newUsersThisMonth),
+      totalHands: Number(totalHands),
       churnRate,
-      conversionRate: totalUsers > 0 ? ((activeSubscriptions / totalUsers) * 100).toFixed(2) : "0.00",
+      conversionRate: totalUsers > 0 ? ((Number(activeSubscriptions) / Number(totalUsers)) * 100).toFixed(2) : "0.00",
     };
   }),
 

@@ -125,3 +125,7 @@
 - [ ] Relatórios financeiros (MRR, churn rate, LTV)
 - [ ] Sistema de notificações para admins
 - [ ] Logs de atividades administrativas
+
+
+## Novos Bugs Reportados
+- [x] Corrigir erro totalRevenue.toFixed is not a function no dashboard admin
