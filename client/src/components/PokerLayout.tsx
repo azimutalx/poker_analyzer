@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  CreditCard,
   Crown,
   FileUp,
   Grid3X3,
@@ -52,6 +53,7 @@ const navItems: NavItem[] = [
 const adminNavItems: NavItem[] = [
   { title: "Admin Dashboard", href: "/admin", icon: Shield },
   { title: "Usuários", href: "/admin/users", icon: User },
+  { title: "Transações", href: "/admin/transactions", icon: CreditCard },
   { title: "Promoções", href: "/admin/promotions", icon: Crown },
   { title: "Anúncios", href: "/admin/announcements", icon: Bell },
 ];

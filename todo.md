@@ -129,3 +129,13 @@
 
 ## Novos Bugs Reportados
 - [x] Corrigir erro totalRevenue.toFixed is not a function no dashboard admin
+
+
+## Nova Funcionalidade: Página de Transações
+- [x] Criar endpoint de transações com filtros por período e status
+- [x] Desenvolver página de transações com tabela detalhada
+- [x] Implementar filtros por status (pending, completed, failed, refunded)
+- [x] Implementar filtro por período (data inicial e final)
+- [x] Adicionar paginação para grandes volumes de dados
+- [x] Implementar exportação de relatórios em CSV
+- [x] Adicionar rota no menu admin

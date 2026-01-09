@@ -418,54 +418,6 @@ export const adminRouter = router({
       return { success: true };
     }),
 
-  // Transactions and payments
-  getTransactions: adminProcedure
-    .input(z.object({
-      page: z.number().default(1),
-      limit: z.number().default(20),
-      status: z.enum(["all", "pending", "completed", "failed", "refunded"]).default("all"),
-    }))
-    .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { transactions: [], totalPages: 0 };
-
-      const { page, limit, status } = input;
-      const offset = (page - 1) * limit;
-
-      const conditions = [];
-      if (status !== "all") {
-        conditions.push(eq(transactions.status, status));
-      }
-
-      const txList = await db.select()
-        .from(transactions)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(transactions.createdAt))
-        .limit(limit)
-        .offset(offset);
-
-      const countResult = await db.select({ count: sql<number>`count(*)` })
-        .from(transactions)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-      const totalCount = countResult[0]?.count || 0;
-      const totalPages = Math.ceil(totalCount / limit);
-
-      // Enrich with user data
-      const enrichedTx = await Promise.all(txList.map(async (tx) => {
-        const user = await db.select().from(users).where(eq(users.id, tx.userId)).limit(1);
-        return {
-          ...tx,
-          user: user[0] || null,
-        };
-      }));
-
-      return {
-        transactions: enrichedTx,
-        totalPages,
-      };
-    }),
-
   // Admin activity logs
   getAdminLogs: adminProcedure
     .input(z.object({
@@ -501,6 +453,91 @@ export const adminRouter = router({
       return {
         logs: enrichedLogs,
         totalPages,
+      };
+    }),
+
+  // Transactions management
+  getTransactions: adminProcedure
+    .input(z.object({
+      page: z.number().default(1),
+      limit: z.number().default(20),
+      status: z.enum(["all", "pending", "completed", "failed", "refunded"]).default("all"),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { transactions: [], totalPages: 0, summary: { total: 0, completed: 0, pending: 0, failed: 0, refunded: 0 } };
+
+      const { page, limit, status, startDate, endDate } = input;
+      const offset = (page - 1) * limit;
+
+      const conditions = [];
+      if (status !== "all") {
+        conditions.push(eq(transactions.status, status));
+      }
+      if (startDate) {
+        conditions.push(gte(transactions.createdAt, new Date(startDate)));
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        conditions.push(lte(transactions.createdAt, end));
+      }
+
+      const transactionsList = await db.select()
+        .from(transactions)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(transactions.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      const countResult = await db.select({ count: sql<number>`count(*)` })
+        .from(transactions)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+      const totalCount = Number(countResult[0]?.count || 0);
+      const totalPages = Math.ceil(totalCount / limit);
+
+      // Enrich with user data and subscription info
+      const enrichedTransactions = await Promise.all(transactionsList.map(async (tx) => {
+        const user = await db.select().from(users).where(eq(users.id, tx.userId)).limit(1);
+        let plan = null;
+        if (tx.subscriptionId) {
+          const subscription = await db.select().from(userSubscriptions).where(eq(userSubscriptions.id, tx.subscriptionId)).limit(1);
+          if (subscription[0]) {
+            const planData = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, subscription[0].planId)).limit(1);
+            plan = planData[0] || null;
+          }
+        }
+        return {
+          ...tx,
+          user: user[0] || null,
+          plan,
+        };
+      }));
+
+      // Calculate summary statistics
+      const summaryResult = await db.select({
+        status: transactions.status,
+        count: sql<number>`count(*)`,
+        total: sql<number>`COALESCE(SUM(amount), 0)`,
+      })
+        .from(transactions)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .groupBy(transactions.status);
+
+      const summary = {
+        total: Number(summaryResult.reduce((sum, row) => sum + Number(row.total || 0), 0).toFixed(2)),
+        completed: Number(summaryResult.find(r => r.status === "completed")?.total || 0),
+        pending: Number(summaryResult.find(r => r.status === "pending")?.total || 0),
+        failed: Number(summaryResult.find(r => r.status === "failed")?.total || 0),
+        refunded: Number(summaryResult.find(r => r.status === "refunded")?.total || 0),
+      };
+
+      return {
+        transactions: enrichedTransactions,
+        totalPages,
+        summary,
       };
     }),
 });

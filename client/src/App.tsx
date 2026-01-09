@@ -19,6 +19,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminPromotions from "./pages/AdminPromotions";
 import AdminAnnouncements from "./pages/AdminAnnouncements";
+import AdminTransactions from "./pages/AdminTransactions";
 
 function Router() {
   return (
@@ -39,7 +40,7 @@ function Router() {
       <Route path="/admin/subscriptions" component={AdminDashboard} />
       <Route path="/admin/promotions" component={AdminPromotions} />
       <Route path="/admin/announcements" component={AdminAnnouncements} />
-      <Route path="/admin/transactions" component={AdminDashboard} />
+      <Route path="/admin/transactions" component={AdminTransactions} />
       <Route path="/admin/logs" component={AdminDashboard} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
